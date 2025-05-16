@@ -13,9 +13,7 @@ COPY ./app /app/app
 #COPY ./data /app/data
 
 # 포트 노출 (Uvicorn 기본 포트 8000)
-EXPOSE 8000
+#EXPOSE 8000
 
 # 애플리케이션 실행 (Uvicorn 사용)
-# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-# --reload 옵션은 개발 시 유용, 프로덕션에서는 제거하거나 gunicorn + uvicorn worker 사용 고려
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
