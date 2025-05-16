@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]  # ASGI 서버
+SQLAlchemy
+psycopg2-binary
+pydantic[email]    # 데이터 유효성 검사 (email은 예시, 필요 없으면 pydantic만)
+python-dotenv      # .env 파일 로드용
+jinja2             # HTML 템플릿용
+python-multipart   # 폼 데이터 처리용 (여기서는 JSON 위주지만 포함)

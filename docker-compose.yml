@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./data:/app/data
+    environment:
+      - POSTGRES_USER=${EXISTING_DB_USER:-root}
+      - POSTGRES_PASSWORD=${EXISTING_DB_PASSWORD:-root}
+      - POSTGRES_DB=${EXISTING_DB_NAME:-workoutdb}
+      - DB_HOST=host.docker.internal
+      - DB_PORT=${EXISTING_DB_HOST_PORT:-5432}
+    networks:
+      - workout_app_network
+
+networks:
+  workout_app_network:
+    driver: bridge

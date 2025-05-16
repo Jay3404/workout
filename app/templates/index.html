@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘의 운동 추천</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>오늘의 운동 추천</h1>
+
+        <label for="body-part-select">운동 부위 선택:</label>
+        <select id="body-part-select">
+            <option value="">-- 부위 선택 --</option>
+            {% for part in body_parts %}
+            <option value="{{ part }}">{{ part }}</option>
+            {% endfor %}
+        </select>
+        <button id="get-recommendations-btn">추천 운동 보기</button>
+
+        <div id="exercise-list-container">
+            <h2>추천 운동</h2>
+            <ul id="exercise-list">
+                </ul>
+        </div>
+
+        <div id="exercise-history-container" style="display:none;">
+            <h2 id="history-exercise-name"></h2>
+            <div id="chart-wrapper" style="position: relative; height: 250px; width: 100%;">
+                <canvas id="weightChart"></canvas>
+            </div>
+            <div id="history-details"></div>
+            <button id="close-history-btn">닫기</button>
+        </div>
+
+        <div id="add-log-form-container" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 20px;">
+            <h3>운동 기록 추가</h3>
+            <label for="log-exercise-select">운동 선택:</label>
+            <select id="log-exercise-select">
+                </select><br>
+            <label for="log-date">날짜:</label>
+            <input type="date" id="log-date" value=""><br>
+            <label for="log-weight">무게 (kg):</label>
+            <input type="number" id="log-weight" step="0.1"><br>
+            <label for="log-reps">횟수:</label>
+            <input type="number" id="log-reps"><br>
+            <label for="log-sets">세트:</label>
+            <input type="number" id="log-sets"><br>
+            <button id="submit-log-btn">기록 저장</button>
+            <p id="log-message"></p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const bodyPartSelect = document.getElementById('body-part-select');
+            const getRecommendationsBtn = document.getElementById('get-recommendations-btn');
+            const exerciseListUl = document.getElementById('exercise-list');
+            const exerciseHistoryContainer = document.getElementById('exercise-history-container');
+            const historyExerciseName = document.getElementById('history-exercise-name');
+            const historyDetailsDiv = document.getElementById('history-details');
+            const closeHistoryBtn = document.getElementById('close-history-btn');
+            let weightChart = null; // 차트 인스턴스 저장 변수
+
+            // 운동 기록 추가 관련 요소
+            const logExerciseSelect = document.getElementById('log-exercise-select');
+            const logDateInput = document.getElementById('log-date');
+            const logWeightInput = document.getElementById('log-weight');
+            const logRepsInput = document.getElementById('log-reps');
+            const logSetsInput = document.getElementById('log-sets');
+            const submitLogBtn = document.getElementById('submit-log-btn');
+            const logMessageP = document.getElementById('log-message');
+
+            // 오늘 날짜로 기본 설정
+            logDateInput.value = new Date().toISOString().split('T')[0];
+
+
+            getRecommendationsBtn.addEventListener('click', async () => {
+                const selectedPart = bodyPartSelect.value;
+                if (!selectedPart) {
+                    alert('운동 부위를 선택해주세요.');
+                    return;
+                }
+
+                exerciseListUl.innerHTML = '<li>로딩 중...</li>'; // 로딩 표시
+                exerciseHistoryContainer.style.display = 'none'; // 이전 기록 숨기기
+
+                try {
+                    const response = await fetch('/get_exercises', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ body_part: selectedPart })
+                    });
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        exerciseListUl.innerHTML = ''; // 기존 목록 초기화
+                        logExerciseSelect.innerHTML = '<option value="">-- 운동 선택 --</option>'; // 기록용 운동 선택 초기화
+
+                        if (data.exercises && data.exercises.length > 0) {
+                            data.exercises.forEach(ex => {
+                                const li = document.createElement('li');
+                                li.textContent = ex.name;
+                                const historyBtn = document.createElement('button');
+                                historyBtn.textContent = '기록 보기';
+                                historyBtn.classList.add('history-btn');
+                                historyBtn.dataset.exerciseId = ex.id;
+                                historyBtn.dataset.exerciseName = ex.name;
+                                li.appendChild(historyBtn);
+                                exerciseListUl.appendChild(li);
+
+                                // 기록 추가 폼의 운동 선택 옵션에도 추가
+                                const option = document.createElement('option');
+                                option.value = ex.id;
+                                option.textContent = ex.name;
+                                logExerciseSelect.appendChild(option);
+                            });
+                        } else {
+                            exerciseListUl.innerHTML = '<li>해당 부위의 추천 운동이 없습니다.</li>';
+                        }
+                    } else {
+                        exerciseListUl.innerHTML = `<li>오류: ${data.error || '운동 목록을 가져오는데 실패했습니다.'}</li>`;
+                    }
+                } catch (error) {
+                    console.error('Error fetching exercises:', error);
+                    exerciseListUl.innerHTML = '<li>네트워크 오류가 발생했습니다.</li>';
+                }
+            });
+
+            exerciseListUl.addEventListener('click', async (event) => {
+                if (event.target.classList.contains('history-btn')) {
+                    const exerciseId = event.target.dataset.exerciseId;
+                    const exerciseName = event.target.dataset.exerciseName;
+
+                    historyDetailsDiv.innerHTML = '로딩 중...';
+                    exerciseHistoryContainer.style.display = 'block';
+                    historyExerciseName.textContent = `${exerciseName} 운동 기록`;
+
+                    try {
+                        const response = await fetch('/get_exercise_history', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ exercise_id: exerciseId })
+                        });
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            renderHistory(data.history);
+                            renderWeightChart(data.history);
+                        } else {
+                            historyDetailsDiv.innerHTML = `오류: ${data.error || '기록을 가져오는데 실패했습니다.'}`;
+                            if (weightChart) weightChart.destroy(); // 오류 시 이전 차트 제거
+                        }
+                    } catch (error) {
+                        console.error('Error fetching history:', error);
+                        historyDetailsDiv.innerHTML = '네트워크 오류가 발생했습니다.';
+                        if (weightChart) weightChart.destroy(); // 오류 시 이전 차트 제거
+                    }
+                }
+            });
+
+            function renderHistory(history) {
+                historyDetailsDiv.innerHTML = ''; // 초기화
+                if (history && history.length > 0) {
+                    const ul = document.createElement('ul');
+                    history.forEach(log => {
+                        const li = document.createElement('li');
+                        li.textContent = `${log.date}: ${log.weight || '-'}kg / ${log.reps || '-'}회 / ${log.sets || '-'}세트`;
+                        ul.appendChild(li);
+                    });
+                    historyDetailsDiv.appendChild(ul);
+                } else {
+                    historyDetailsDiv.innerHTML = '<p>이 운동에 대한 기록이 아직 없습니다.</p>';
+                }
+            }
+
+            function renderWeightChart(history) {
+                const ctx = document.getElementById('weightChart').getContext('2d');
+                if (weightChart) {
+                    weightChart.destroy(); // 이전 차트가 있다면 파괴
+                }
+
+                if (!history || history.length === 0) {
+                    // 데이터가 없으면 차트를 그리지 않음 (또는 빈 차트 메시지)
+                    return;
+                }
+
+                const labels = history.map(log => log.date);
+                const weights = history.map(log => log.weight);
+
+                weightChart = new Chart(ctx, {
+                    type: 'line', // 선 그래프
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '무게 변화 (kg)',
+                            data: weights,
+                            borderColor: 'rgb(75, 192, 192)',
+                            tension: 0.1,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false, // 무게는 0부터 시작하지 않을 수 있음
+                                title: {
+                                    display: true,
+                                    text: '무게 (kg)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: '날짜'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+
+            closeHistoryBtn.addEventListener('click', () => {
+                exerciseHistoryContainer.style.display = 'none';
+                if (weightChart) {
+                    weightChart.destroy(); // 차트 닫을 때 파괴
+                    weightChart = null;
+                }
+            });
+
+            submitLogBtn.addEventListener('click', async () => {
+                const exerciseId = '하체';
+                const date = logDateInput.value;
+                const weight = logWeightInput.value;
+                const reps = logRepsInput.value;
+                const sets = logSetsInput.value;
+
+                if (!exerciseId || !date || !weight || !reps || !sets) {
+                    logMessageP.textContent = '모든 필드를 입력해주세요.';
+                    logMessageP.style.color = 'red';
+                    return;
+                }
+
+                logMessageP.textContent = '저장 중...';
+                logMessageP.style.color = 'blue';
+
+                try {
+                    const response = await fetch('/add_log', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            exercise_id: parseInt(exerciseId),
+                            date: date,
+                            weight: parseFloat(weight),
+                            reps: parseInt(reps),
+                            sets: parseInt(sets)
+                        })
+                    });
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        logMessageP.textContent = data.message;
+                        logMessageP.style.color = 'green';
+                        // 폼 초기화
+                        // logExerciseSelect.value = ''; // 선택 유지 가능
+                        logWeightInput.value = '';
+                        logRepsInput.value = '';
+                        logSetsInput.value = '';
+                        // 필요하다면 현재 보고 있는 운동 기록을 새로고침 할 수 있습니다.
+                    } else {
+                        logMessageP.textContent = `오류: ${data.error || '기록 저장에 실패했습니다.'}`;
+                        logMessageP.style.color = 'red';
+                    }
+                } catch (error) {
+                    console.error('Error submitting log:', error);
+                    logMessageP.textContent = '네트워크 오류가 발생했습니다.';
+                    logMessageP.style.color = 'red';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
