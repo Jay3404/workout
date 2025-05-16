@@ -9,10 +9,10 @@ services:
       - ./app:/app/app
       - ./data:/app/data
     environment:
-      - POSTGRES_USER=${EXISTING_DB_USER:-root}
-      - POSTGRES_PASSWORD=${EXISTING_DB_PASSWORD:-root}
+      - POSTGRES_USER=${EXISTING_DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${EXISTING_DB_PASSWORD:-postgres}
       - POSTGRES_DB=${EXISTING_DB_NAME:-workoutdb}
-      - DB_HOST=host.docker.internal
+      - DB_HOST=34.22.97.207
       - DB_PORT=${EXISTING_DB_HOST_PORT:-5432}
     networks:
       - workout_app_network

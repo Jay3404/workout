@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 애플리케이션 코드 복사
 COPY ./app /app/app
-COPY ./data /app/data
+#COPY ./data /app/data
 
 # 포트 노출 (Uvicorn 기본 포트 8000)
 EXPOSE 8000
